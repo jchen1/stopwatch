@@ -8,7 +8,7 @@
  */
 
 import React, {Component} from 'react';
-import {Button, Platform, StyleSheet, Text, View} from 'react-native';
+import {Button, Platform, StyleSheet, Text, View, Vibration} from 'react-native';
 import SystemSetting from 'react-native-system-setting';
 import moment from 'moment';
 
@@ -24,13 +24,19 @@ function getDisplayTime(duration) {
 export default class App extends Component {
   constructor(props) {
     super(props);
+    SystemSetting.getVolume().then(v => { this.initialVolume = v });
+    this.volumeListener = SystemSetting.addVolumeListener(this.volumeHandler);
     this.state = { running: false, startTime: null, timer: null, runningTime: null };
   }
 
-  componentDidMount = () => {
-    this.volumeListener = SystemSetting.addVolumeListener(data => {
-      this.startStop();
-    });
+  volumeHandler = newVolume => {
+    this.startStop();
+    Vibration.vibrate(1);
+    SystemSetting.removeVolumeListener(this.volumeListener);
+    SystemSetting.setVolume(this.initialVolume);
+    setTimeout(() => {
+      this.volumeListener = SystemSetting.addVolumeListener(this.volumeHandler);
+    }, 100);
   }
 
   startStop = () => {
