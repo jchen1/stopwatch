@@ -8,25 +8,51 @@
  */
 
 import React, {Component} from 'react';
-import {Button, Platform, StyleSheet, Text, View, Vibration} from 'react-native';
+import {AppState, Button, Platform, StyleSheet, Text, View, Vibration} from 'react-native';
 import SystemSetting from 'react-native-system-setting';
 import moment from 'moment';
 
+function leftpad(input, minLength, padChar) {
+  const str = String(input);
+  if (str.length >= minLength) return str;
+  return padChar.repeat(minLength - str.length) + str;
+}
+
 function getDisplayTime(duration) {
   const diff = moment.duration(duration, 'milliseconds');
-  const hours = Math.floor(diff.asHours()).toLocaleString(undefined, { minimumIntegerDigits: 2 });
-  const minutes = Math.floor(diff.asMinutes()).toLocaleString(undefined, { minimumIntegerDigits: 2 });
-  const seconds = Math.floor(diff.asSeconds()).toLocaleString(undefined, { minimumIntegerDigits: 2 });
-  const tail = (Math.floor(diff.asMilliseconds() / 10) % 100).toLocaleString(undefined, { minimumIntegerDigits: 2 });
-  return `${hours}:${minutes}:${seconds}:${tail}`;
+  const hours = leftpad(Math.floor(diff.asHours()), 2, '0');
+  const minutes = leftpad(Math.floor(diff.asMinutes()), 2, '0');
+  const seconds = leftpad(Math.floor(diff.asSeconds()), 2, '0');
+  const ms = leftpad(Math.floor(diff.asMilliseconds() / 10) % 100, 2, '0');
+  return `${hours}:${minutes}:${seconds}.${ms}`;
 }
 
 export default class App extends Component {
   constructor(props) {
     super(props);
-    SystemSetting.getVolume().then(v => { this.initialVolume = v });
-    this.volumeListener = SystemSetting.addVolumeListener(this.volumeHandler);
-    this.state = { running: false, startTime: null, timer: null, runningTime: null };
+    SystemSetting.getVolume().then(v => {
+      this.initialVolume = v;
+      SystemSetting.setVolume(this.initialVolume);
+    });
+    this.bindVolumeListener();
+    this.state = { running: false, startTime: null, timer: null, runningTime: null, appState: AppState.currentState };
+  }
+
+  bindVolumeListener = () => {
+    setTimeout(() => {
+      this.volumeListener = SystemSetting.addVolumeListener(this.volumeHandler);
+    }, 100);
+  }
+
+  unbindVolumeListener = () => {
+    if (this.volumeListener) {
+      SystemSetting.removeVolumeListener(this.volumeListener);
+      this.volumeListener = null;
+    }
+  }
+
+  componentDidMount = () => {
+    AppState.addEventListener('change', this.handleAppStateChange);
   }
 
   volumeHandler = newVolume => {
@@ -34,9 +60,15 @@ export default class App extends Component {
     Vibration.vibrate(1);
     SystemSetting.removeVolumeListener(this.volumeListener);
     SystemSetting.setVolume(this.initialVolume);
-    setTimeout(() => {
-      this.volumeListener = SystemSetting.addVolumeListener(this.volumeHandler);
-    }, 100);
+    this.bindVolumeListener();
+  }
+
+  handleAppStateChange = nextAppState => {
+    if (nextAppState === 'active') {
+      this.bindVolumeListener();
+    } else {
+      this.unbindVolumeListener();
+    }
   }
 
   startStop = () => {
@@ -51,33 +83,38 @@ export default class App extends Component {
             return { runningTime: Date.now() - previousState.startTime };
           });
         }, 5);
-        return { startTime, running: true, runningTime: 0, timer };
+        return { startTime, running: true, runningTime: Date.now() - startTime, timer };
       }
     });
   }
 
   reset = () => {
-    this.setState(previousState => {
-      if (previousState.running) {
-        clearInterval(previousState.timer);
-      }
-      return { running: false, timer: null, startTime: null, runningTime: null};
-    });
+    if (!this.state.running) {
+      this.setState(previousState => {
+        if (previousState.running) {
+          clearInterval(previousState.timer);
+        }
+        return { running: false, timer: null, startTime: null, runningTime: null};
+      });
+    }
   }
 
   render() {
     return (
       <View style={styles.container}>
         <Text style={styles.timer}>{getDisplayTime(this.state.runningTime)}</Text>
-        <Button onPress={this.startStop} title={this.state.running ? "Stop" : "Start"}></Button>
-        <Button onPress={this.reset} title="Reset"></Button>
+        <View style={styles.buttonContainer}>
+          <Button style={styles.button} onPress={this.startStop} title={this.state.running ? "Stop" : "Start"}></Button>
+          <Button style={styles.button} onPress={this.reset} title="Reset" color="#ff0000" disabled={this.state.running}></Button>
+        </View>
       </View>
     );
   }
 
   componentWillUnmount = () => {
     clearInterval(this.state.timer);
-    SystemSetting.removeVolumeListener(this.volumeListener);
+    this.unbindVolumeListener();
+    AppState.removeEventListener('change', this.handleAppStateChange);
   }
 }
 
@@ -88,9 +125,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F5FCFF',
   },
+  buttonContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    // idk...
+    flexGrow: 0.1,
+  },
   timer: {
     fontSize: 40,
     textAlign: 'center',
     margin: 10,
+    fontFamily: 'CourierNewPS-BoldMT',
   },
+  button: {
+    width: '50%',
+  }
 });
