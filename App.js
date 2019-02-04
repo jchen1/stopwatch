@@ -35,13 +35,13 @@ export default class App extends Component {
       SystemSetting.setVolume(this.initialVolume);
     });
     this.bindVolumeListener();
-    this.state = { running: false, startTime: null, timer: null, runningTime: null, appState: AppState.currentState };
+    this.state = { running: false, startTime: null, timer: null, runningTime: null };
   }
 
-  bindVolumeListener = () => {
+  bindVolumeListener = timeout => {
     setTimeout(() => {
       this.volumeListener = SystemSetting.addVolumeListener(this.volumeHandler);
-    }, 100);
+    }, timeout || 100);
   }
 
   unbindVolumeListener = () => {
@@ -65,7 +65,7 @@ export default class App extends Component {
 
   handleAppStateChange = nextAppState => {
     if (nextAppState === 'active') {
-      this.bindVolumeListener();
+      this.bindVolumeListener(0);
     } else {
       this.unbindVolumeListener();
     }
