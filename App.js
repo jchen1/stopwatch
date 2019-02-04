@@ -34,21 +34,20 @@ export default class App extends Component {
       this.initialVolume = v;
       SystemSetting.setVolume(this.initialVolume);
     });
+    this.volumeListeners = [];
     this.bindVolumeListener();
     this.state = { running: false, startTime: null, timer: null, runningTime: null };
   }
 
   bindVolumeListener = timeout => {
     setTimeout(() => {
-      this.volumeListener = SystemSetting.addVolumeListener(this.volumeHandler);
+      this.volumeListeners.push(SystemSetting.addVolumeListener(this.volumeHandler));
     }, timeout || 100);
   }
 
-  unbindVolumeListener = () => {
-    if (this.volumeListener) {
-      SystemSetting.removeVolumeListener(this.volumeListener);
-      this.volumeListener = null;
-    }
+  unbindVolumeListeners = () => {
+    this.volumeListeners.map(l => SystemSetting.removeVolumeListener(l));
+    this.volumeListeners = [];
   }
 
   componentDidMount = () => {
@@ -58,16 +57,16 @@ export default class App extends Component {
   volumeHandler = newVolume => {
     this.startStop();
     Vibration.vibrate(1);
-    SystemSetting.removeVolumeListener(this.volumeListener);
+    this.unbindVolumeListeners();
     SystemSetting.setVolume(this.initialVolume);
     this.bindVolumeListener();
   }
 
   handleAppStateChange = nextAppState => {
     if (nextAppState === 'active') {
-      this.bindVolumeListener(0);
+      this.bindVolumeListener(10);
     } else {
-      this.unbindVolumeListener();
+      this.unbindVolumeListeners();
     }
   }
 
@@ -113,7 +112,7 @@ export default class App extends Component {
 
   componentWillUnmount = () => {
     clearInterval(this.state.timer);
-    this.unbindVolumeListener();
+    this.unbindVolumeListeners();
     AppState.removeEventListener('change', this.handleAppStateChange);
   }
 }
