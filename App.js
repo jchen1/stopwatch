@@ -21,8 +21,8 @@ function leftpad(input, minLength, padChar) {
 function getDisplayTime(duration) {
   const diff = moment.duration(duration, 'milliseconds');
   const hours = leftpad(Math.floor(diff.asHours()), 2, '0');
-  const minutes = leftpad(Math.floor(diff.asMinutes()), 2, '0');
-  const seconds = leftpad(Math.floor(diff.asSeconds()), 2, '0');
+  const minutes = leftpad(Math.floor(diff.asMinutes() % 60), 2, '0');
+  const seconds = leftpad(Math.floor(diff.asSeconds() % 60), 2, '0');
   const ms = leftpad(Math.floor(diff.asMilliseconds() / 10) % 100, 2, '0');
   return `${hours}:${minutes}:${seconds}.${ms}`;
 }
